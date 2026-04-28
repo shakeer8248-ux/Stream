@@ -2,65 +2,62 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TV Cloud Cinema</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     
     <style>
-        :root { --bg: #0a0a0a; --card: #1a1a1a; --accent: #ff3e3e; }
-        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; padding: 15px; }
+        body { background: #0a0a0a; color: #fff; font-family: sans-serif; margin: 0; padding: 20px; }
         
-        /* Header */
-        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; }
-        .upload-btn { background: var(--accent); color: white; border: none; padding: 10px 15px; border-radius: 5px; font-weight: bold; }
-
-        /* Gallery Grid */
-        #gallery { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); 
-            gap: 15px; margin-top: 20px; 
-        }
-        .movie-card { background: var(--card); border-radius: 10px; overflow: hidden; text-align: center; border: 1px solid #333; }
-        .movie-card:focus { border: 3px solid white; outline: none; } /* Better for TV Remote */
-        .thumb { height: 100px; background: #222; display: flex; align-items: center; justify-content: center; font-size: 30px; }
-        .title { padding: 10px; font-size: 13px; font-weight: bold; }
-
-        /* Player Overlay */
-        #player-layer { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 1000; }
-        video { width: 100%; height: 100%; }
-        .back-btn { position: absolute; top: 10px; left: 10px; z-index: 1001; background: rgba(0,0,0,0.6); color: white; border: 1px solid #fff; padding: 8px; }
-
-        /* Simple Modal */
-        #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 500; flex-direction: column; align-items: center; justify-content: center; }
-        input { width: 80%; padding: 12px; margin: 5px; background: #222; color: #fff; border: 1px solid #444; }
+        /* Top Header & Button */
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px; }
+        .upload-btn { background: #e50914; color: #fff; border: none; padding: 10px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        
+        /* Movie Gallery */
+        #gallery { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 20px; }
+        .card { background: #1a1a1a; width: 140px; padding: 10px; text-align: center; border-radius: 8px; border: 2px solid #1a1a1a; cursor: pointer; transition: 0.2s; }
+        .card:focus, .card:hover { border-color: #e50914; outline: none; } /* Focus helps TV remotes */
+        .thumb { height: 90px; background: #000; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; font-size: 30px;}
+        .title { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        /* Modal & Player Overlays */
+        #modal, #player { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 100; }
+        
+        #modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; padding: 30px; border-radius: 10px; width: 80%; max-width: 400px; text-align: center; }
+        input { width: 90%; padding: 12px; margin: 10px 0; background: #333; color: white; border: 1px solid #555; }
+        
+        /* Google Drive Iframe Player */
+        iframe { width: 100%; height: 100%; border: none; }
+        .close-btn { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.8); color: white; padding: 10px 15px; border: 1px solid white; z-index: 101; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <header>
-        <h3>Cloud Movies</h3>
-        <button class="upload-btn" onclick="showModal(true)">+ ADD</button>
-    </header>
+    <div class="header">
+        <h2>My Movies</h2>
+        <button class="upload-btn" onclick="openModal()">+ UPLOAD</button>
+    </div>
 
     <div id="gallery">Loading movies...</div>
 
     <div id="modal">
-        <h3>Add Movie</h3>
-        <input type="text" id="mName" placeholder="Movie Title">
-        <input type="text" id="mUrl" placeholder="Google Drive Link">
-        <button class="upload-btn" style="width:80%; margin-top:10px;" onclick="uploadToFirebase()">Save to Cloud</button>
-        <button onclick="showModal(false)" style="background:none; color:gray; border:none; margin-top:10px;">Close</button>
+        <div id="modal-content">
+            <h3>Add to Web Gallery</h3>
+            <input type="text" id="mName" placeholder="Movie Name">
+            <input type="text" id="mUrl" placeholder="Paste Google Drive Link here">
+            <button class="upload-btn" style="width: 100%;" onclick="saveToFirebase()">Save Link</button>
+            <button style="background: none; color: gray; border: none; margin-top: 15px; width: 100%;" onclick="closeModal()">Cancel</button>
+        </div>
     </div>
 
-    <div id="player-layer">
-        <button class="back-btn" onclick="closeVideo()">← Back to Gallery</button>
-        <video id="tvPlayer" controls autoplay></video>
+    <div id="player">
+        <button class="close-btn" onclick="closePlayer()">← Back to Gallery</button>
+        <iframe id="iframePlayer" allowfullscreen="true"></iframe>
     </div>
 
     <script>
-        // 1. YOUR FIREBASE CONFIG GOES HERE
-        const firebaseConfig = {
+        // 1. FIREBASE CONFIG (Paste your keys here)
+        var firebaseConfig = {
   apiKey: "AIzaSyBLVk6QVQXJJCnOICUw0nyUqwiL_jgY9M4",
   authDomain: "tv08-264a1.firebaseapp.com",
   databaseURL: "https://tv08-264a1-default-rtdb.firebaseio.com",
@@ -69,69 +66,72 @@
   messagingSenderId: "616916584219",
   appId: "1:616916584219:web:3d13ab8b1577016882b5be"
 };
-
-        // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
+        var db = firebase.firestore();
 
-        // 2. Upload Function
-        function uploadToFirebase() {
-            const name = document.getElementById('mName').value;
-            const rawUrl = document.getElementById('mUrl').value;
-            const fileIdMatch = rawUrl.match(/\/d\/(.+?)\//);
+        // 2. OPEN / CLOSE WINDOWS
+        function openModal() { document.getElementById('modal').style.display = 'block'; }
+        function closeModal() { document.getElementById('modal').style.display = 'none'; }
+        function closePlayer() { 
+            document.getElementById('iframePlayer').src = ""; 
+            document.getElementById('player').style.display = 'none'; 
+        }
 
-            if (name && fileIdMatch) {
-                const streamUrl = "https://drive.google.com/uc?export=download&id=" + fileIdMatch[1];
+        // 3. SEND LINK TO FIREBASE (Written for Android 5 compatibility)
+        function saveToFirebase() {
+            var name = document.getElementById('mName').value;
+            var rawUrl = document.getElementById('mUrl').value;
+            
+            // This grabs the ID out of the Google Drive link
+            var match = rawUrl.match(/\/d\/(.+?)\//);
+
+            if (name && match && match[1]) {
+                // Creates a Google Drive Embed Player link
+                var embedUrl = "https://drive.google.com/file/d/" + match[1] + "/preview";
+                
                 db.collection("movies").add({
                     title: name,
-                    url: streamUrl,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                }).then(() => {
-                    showModal(false);
+                    url: embedUrl,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                }).then(function() {
                     document.getElementById('mName').value = '';
                     document.getElementById('mUrl').value = '';
+                    closeModal();
+                }).catch(function(error) {
+                    alert("Database Error: " + error.message);
                 });
             } else {
-                alert("Check your link and name!");
+                alert("Please make sure it is a valid Google Drive link!");
             }
         }
 
-        // 3. Real-time Gallery Sync
-        db.collection("movies").orderBy("createdAt", "desc").onSnapshot((snapshot) => {
-            const gallery = document.getElementById('gallery');
+        // 4. LOAD GALLERY FROM FIREBASE IN REAL-TIME
+        db.collection("movies").orderBy("timestamp", "desc").onSnapshot(function(snapshot) {
+            var gallery = document.getElementById('gallery');
             gallery.innerHTML = '';
-            snapshot.forEach((doc) => {
-                const movie = doc.data();
-                const card = document.createElement('div');
-                card.className = 'movie-card';
-                card.tabIndex = 0; // Makes it focusable for TV remotes
-                card.onclick = () => playMovie(movie.url);
-                card.innerHTML = `
-                    <div class="thumb">🎬</div>
-                    <div class="title">${movie.title}</div>
-                `;
+            
+            if (snapshot.empty) {
+                gallery.innerHTML = '<p style="color: gray;">No movies yet. Click + UPLOAD to add one.</p>';
+                return;
+            }
+
+            // Build the cards
+            snapshot.forEach(function(doc) {
+                var movie = doc.data();
+                var card = document.createElement('div');
+                card.className = 'card';
+                card.tabIndex = 0; // Allows TV remote to select it
+                
+                // When card is clicked, open the iframe player
+                card.onclick = function() {
+                    document.getElementById('iframePlayer').src = movie.url;
+                    document.getElementById('player').style.display = 'block';
+                };
+
+                card.innerHTML = '<div class="thumb">🎬</div><div class="title">' + movie.title + '</div>';
                 gallery.appendChild(card);
             });
-            if(snapshot.empty) gallery.innerHTML = "No movies added yet.";
         });
-
-        // 4. Video Player Controls
-        function playMovie(url) {
-            const v = document.getElementById('tvPlayer');
-            v.src = url;
-            document.getElementById('player-layer').style.display = 'block';
-        }
-
-        function closeVideo() {
-            const v = document.getElementById('tvPlayer');
-            v.pause();
-            v.src = "";
-            document.getElementById('player-layer').style.display = 'none';
-        }
-
-        function showModal(status) {
-            document.getElementById('modal').style.display = status ? 'flex' : 'none';
-        }
     </script>
 </body>
 </html>
