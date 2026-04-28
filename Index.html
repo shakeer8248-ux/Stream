@@ -3,80 +3,132 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TV Movie Streamer</title>
+    <title>My TV Cinema</title>
     <style>
-        body { background: #111; color: white; font-family: sans-serif; margin: 0; text-align: center; }
-        #player-container { width: 100%; background: #000; margin-bottom: 10px; }
-        video { width: 100%; max-height: 80vh; outline: none; }
+        :root { --bg: #0f0f0f; --card: #1e1e1e; --accent: #e50914; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; }
         
-        .controls { padding: 20px; }
+        /* Header & Upload Button */
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
         .upload-btn { 
-            background: #444; color: #fff; border: none; padding: 10px 15px; 
-            border-radius: 5px; cursor: pointer; font-size: 14px;
+            background: var(--accent); color: white; border: none; padding: 12px 20px; 
+            border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 16px;
         }
-        
-        /* Modal / Upload Page Overlay */
-        #upload-page {
-            display: none; position: fixed; top: 0; left: 0; 
-            width: 100%; height: 100%; background: rgba(0,0,0,0.95);
-            padding-top: 50px;
+
+        /* Movie Gallery Grid */
+        #gallery { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); 
+            gap: 20px; 
         }
-        input { width: 80%; padding: 15px; margin: 10px 0; border-radius: 5px; border: none; }
-        .add-btn { background: #007bff; color: white; padding: 15px 30px; border: none; border-radius: 5px; }
+        .movie-card { 
+            background: var(--card); border-radius: 8px; overflow: hidden; 
+            transition: transform 0.2s; cursor: pointer; border: 2px solid transparent;
+        }
+        .movie-card:hover { transform: scale(1.05); border-color: var(--accent); }
+        .thumbnail { 
+            width: 100%; height: 120px; background: #333; 
+            display: flex; align-items: center; justify-content: center; font-size: 40px;
+        }
+        .title { padding: 10px; font-size: 14px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* Fullscreen Player */
+        #player-overlay { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: black; z-index: 100; 
+        }
+        video { width: 100%; height: 100%; }
+        .close-player { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.5); color: white; border: none; padding: 10px; z-index: 101; cursor: pointer; }
+
+        /* Modal for adding links */
+        #modal { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.9); z-index: 200; justify-content: center; align-items: center;
+        }
+        .modal-content { background: #222; padding: 30px; border-radius: 10px; width: 80%; max-width: 500px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; box-sizing: border-box; background: #333; color: white; border: 1px solid #444; }
     </style>
 </head>
 <body>
 
-    <div id="player-container">
-        <video id="mainVideo" controls autoplay>
-            <source src="" type="video/mp4">
-            Your browser is too old for this video.
-        </video>
+    <header>
+        <h1>My Movies</h1>
+        <button class="upload-btn" onclick="openModal()">+ UPLOAD</button>
+    </header>
+
+    <div id="gallery">
+        </div>
+
+    <div id="player-overlay">
+        <button class="close-player" onclick="closePlayer()">✕ Close</button>
+        <video id="videoPlayer" controls></video>
     </div>
 
-    <div class="controls">
-        <button class="upload-btn" onclick="toggleUpload()">+ Add Movie Link</button>
-        <p id="movieTitle" style="color: #888;"></p>
-    </div>
-
-    <div id="upload-page">
-        <h2>Paste Google Drive Link</h2>
-        <input type="text" id="driveLink" placeholder="https://drive.google.com/file/d/ID_HERE/view...">
-        <br>
-        <button class="add-btn" onclick="processLink()">Play Movie</button>
-        <br><br>
-        <button onclick="toggleUpload()" style="background:none; color:gray; border:none;">Close</button>
+    <div id="modal">
+        <div class="modal-content">
+            <h3>Add New Movie</h3>
+            <input type="text" id="movieName" placeholder="Movie Name (e.g. Inception)">
+            <input type="text" id="movieUrl" placeholder="Paste Google Drive Link">
+            <button class="upload-btn" style="width:100%" onclick="saveMovie()">Add to Gallery</button>
+            <button onclick="closeModal()" style="background:none; color:gray; border:none; width:100%; margin-top:10px;">Cancel</button>
+        </div>
     </div>
 
     <script>
-        function toggleUpload() {
-            var page = document.getElementById('upload-page');
-            page.style.display = (page.style.display === 'block') ? 'none' : 'block';
-        }
+        let movies = JSON.parse(localStorage.getItem('myMovies')) || [];
 
-        function processLink() {
-            var rawLink = document.getElementById('driveLink').value;
-            var videoPlayer = document.getElementById('mainVideo');
-            
-            // Extract the File ID from the Google Drive URL
-            var fileId = "";
-            var parts = rawLink.match(/\/d\/(.+?)\/(view|edit|copy)/);
-            
-            if (parts && parts[1]) {
-                fileId = parts[1];
-                // Convert to a direct stream link
-                var streamUrl = "https://drive.google.com/uc?export=download&id=" + fileId;
-                
-                videoPlayer.src = streamUrl;
-                videoPlayer.load();
-                videoPlayer.play();
-                
-                document.getElementById('movieTitle').innerText = "Playing Movie ID: " + fileId;
-                toggleUpload();
+        function openModal() { document.getElementById('modal').style.display = 'flex'; }
+        function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+        function saveMovie() {
+            const name = document.getElementById('movieName').value;
+            const rawUrl = document.getElementById('movieUrl').value;
+            const fileId = rawUrl.match(/\/d\/(.+?)\//);
+
+            if (name && fileId) {
+                const streamUrl = `https://drive.google.com/uc?export=download&id=${fileId[1]}`;
+                movies.push({ name, url: streamUrl });
+                localStorage.setItem('myMovies', JSON.stringify(movies));
+                renderGallery();
+                closeModal();
+                document.getElementById('movieName').value = '';
+                document.getElementById('movieUrl').value = '';
             } else {
-                alert("Invalid Link. Please ensure it is a Google Drive share link.");
+                alert("Please enter a name and valid Drive link!");
             }
         }
+
+        function renderGallery() {
+            const container = document.getElementById('gallery');
+            container.innerHTML = '';
+            movies.forEach((movie, index) => {
+                const card = document.createElement('div');
+                card.className = 'movie-card';
+                card.onclick = () => playMovie(movie.url);
+                card.innerHTML = `
+                    <div class="thumbnail">🎬</div>
+                    <div class="title">${movie.name}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function playMovie(url) {
+            const player = document.getElementById('videoPlayer');
+            player.src = url;
+            document.getElementById('player-overlay').style.display = 'block';
+            player.play();
+        }
+
+        function closePlayer() {
+            const player = document.getElementById('videoPlayer');
+            player.pause();
+            player.src = "";
+            document.getElementById('player-overlay').style.display = 'none';
+        }
+
+        // Initial Load
+        renderGallery();
     </script>
 </body>
 </html>
