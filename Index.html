@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TV Movie Streamer</title>
+    <style>
+        body { background: #111; color: white; font-family: sans-serif; margin: 0; text-align: center; }
+        #player-container { width: 100%; background: #000; margin-bottom: 10px; }
+        video { width: 100%; max-height: 80vh; outline: none; }
+        
+        .controls { padding: 20px; }
+        .upload-btn { 
+            background: #444; color: #fff; border: none; padding: 10px 15px; 
+            border-radius: 5px; cursor: pointer; font-size: 14px;
+        }
+        
+        /* Modal / Upload Page Overlay */
+        #upload-page {
+            display: none; position: fixed; top: 0; left: 0; 
+            width: 100%; height: 100%; background: rgba(0,0,0,0.95);
+            padding-top: 50px;
+        }
+        input { width: 80%; padding: 15px; margin: 10px 0; border-radius: 5px; border: none; }
+        .add-btn { background: #007bff; color: white; padding: 15px 30px; border: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="player-container">
+        <video id="mainVideo" controls autoplay>
+            <source src="" type="video/mp4">
+            Your browser is too old for this video.
+        </video>
+    </div>
+
+    <div class="controls">
+        <button class="upload-btn" onclick="toggleUpload()">+ Add Movie Link</button>
+        <p id="movieTitle" style="color: #888;"></p>
+    </div>
+
+    <div id="upload-page">
+        <h2>Paste Google Drive Link</h2>
+        <input type="text" id="driveLink" placeholder="https://drive.google.com/file/d/ID_HERE/view...">
+        <br>
+        <button class="add-btn" onclick="processLink()">Play Movie</button>
+        <br><br>
+        <button onclick="toggleUpload()" style="background:none; color:gray; border:none;">Close</button>
+    </div>
+
+    <script>
+        function toggleUpload() {
+            var page = document.getElementById('upload-page');
+            page.style.display = (page.style.display === 'block') ? 'none' : 'block';
+        }
+
+        function processLink() {
+            var rawLink = document.getElementById('driveLink').value;
+            var videoPlayer = document.getElementById('mainVideo');
+            
+            // Extract the File ID from the Google Drive URL
+            var fileId = "";
+            var parts = rawLink.match(/\/d\/(.+?)\/(view|edit|copy)/);
+            
+            if (parts && parts[1]) {
+                fileId = parts[1];
+                // Convert to a direct stream link
+                var streamUrl = "https://drive.google.com/uc?export=download&id=" + fileId;
+                
+                videoPlayer.src = streamUrl;
+                videoPlayer.load();
+                videoPlayer.play();
+                
+                document.getElementById('movieTitle').innerText = "Playing Movie ID: " + fileId;
+                toggleUpload();
+            } else {
+                alert("Invalid Link. Please ensure it is a Google Drive share link.");
+            }
+        }
+    </script>
+</body>
+</html>
